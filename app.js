@@ -3,13 +3,14 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-
 const app = express();
 const miPuerto = process.env.MIPUERTO || 3333;
 
 // Middleware para formatear JSON y servir estáticos
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+
 
 // Configuración de Multer para imágenes de productos
 const storage = multer.diskStorage({
@@ -103,6 +104,8 @@ app.put("/api/aprendices/:id", (req, res) => {
   guardarJSON(pathAprendices, aprendices);
   res.json(aprendices[index]);
 });
+
+
 
 // 5. DELETE: Eliminar un aprendiz por ID
 app.delete("/api/aprendices/:id", (req, res) => {
