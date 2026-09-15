@@ -3,14 +3,22 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const jwt = require("jsonwebtoken");
+
+// Importar middlewares desde la carpeta middleware (nombres exactos de tus archivos)
+const autenticacionToken = require("./middleware/Autentificaciones");
+const manejadorErrores = require("./middleware/manejadorErrores");
+const registroMiddleware = require("./middleware/registroMiddleware");
+
 const app = express();
 const miPuerto = process.env.MIPUERTO || 3333;
+
+// Middleware global para registrar logs de peticiones
+app.use(registroMiddleware);
 
 // Middleware para formatear JSON y servir estáticos
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
-
 
 // Configuración de Multer para imágenes de productos
 const storage = multer.diskStorage({
@@ -40,6 +48,47 @@ const guardarJSON = (filePath, data) => fs.writeFileSync(filePath, JSON.stringif
 // Endpoint Raíz
 app.get("/", (req, res) => {
   res.send("<h1>API REST - Productos & Aprendices SENA</h1>");
+});
+
+/* ==========================================================================
+   ENDPOINT DE REGISTRO / AUTENTICACIÓN (Genera el Token JWT)
+   ========================================================================== */
+app.post("/api/registro", (req, res) => {
+  const { nombre, email, password } = req.body;
+
+  if (!nombre || !email || !password) {
+    return res.status(400).json({ mensaje: "Todos los campos son obligatorios" });
+  }
+
+  // Payload codificado en el token
+  const payload = { nombre, email, password };
+
+  // Generar el token (expira en 1 hora)
+  const token = jwt.sign(payload, process.env.JWT_SECRET || "clave_secreta_sena", {
+    expiresIn: "1h"
+  });
+
+  res.status(201).json({
+    mensaje: "Registro exitoso y acceso concedido",
+    token: token
+  });
+});
+
+/* ==========================================================================
+   RUTA PROTEGIDA (Verifica JWT mediante middleware)
+   ========================================================================== */
+app.get("/rutaProtegida", autenticacionToken, (req, res) => {
+  res.json({
+    mensaje: "¡Acceso concedido a la ruta protegida!",
+    usuario: req.aprendiz
+  });
+});
+
+/* ==========================================================================
+   PRUEBA DE ERRORES INTENCIONALES
+   ========================================================================== */
+app.get("/Error", (req, res, next) => {
+  next(new Error("Error provocado, intencional"));
 });
 
 /* ==========================================================================
@@ -104,8 +153,6 @@ app.put("/api/aprendices/:id", (req, res) => {
   guardarJSON(pathAprendices, aprendices);
   res.json(aprendices[index]);
 });
-
-
 
 // 5. DELETE: Eliminar un aprendiz por ID
 app.delete("/api/aprendices/:id", (req, res) => {
@@ -192,6 +239,11 @@ app.delete("/api/productos/:id", (req, res) => {
   guardarJSON(pathProductos, productos);
   res.json({ mensaje: "Producto eliminado correctamente" });
 });
+
+/* ==========================================================================
+   MIDDLEWARE GLOBAL DE MANEJO DE ERRORES
+   ========================================================================== */
+app.use(manejadorErrores);
 
 app.listen(miPuerto, () => {
   console.log(`SERVIDOR: http://localhost:${miPuerto}`);
